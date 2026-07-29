@@ -13,23 +13,35 @@
   ],
   "license": "MIT",
   "homepage": "https://git.sockets.ar/hernan/n8n-nodes-ipquery",
-  "author": { "name": "Hernan", "email": "hernannh@gmail.com" },
-  "repository": { "type": "git", "url": "https://git.sockets.ar/hernan/n8n-nodes-ipquery.git" },
-  "engines": { "node": ">=20.15" },
+  "author": {
+    "name": "Hernan",
+    "email": "hernannh@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://git.sockets.ar/hernan/n8n-nodes-ipquery.git"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
   "main": "index.js",
   "scripts": {
-    "build": "npx rimraf dist && tsc && gulp build:icons",
+    "build": "npx rimraf dist && tsc && gulp build:icons && node tools/verify-build.mjs",
     "dev": "tsc --watch",
     "format": "prettier nodes --write",
     "lint": "eslint nodes package.json",
     "lintfix": "eslint nodes package.json --fix",
     "prepublishOnly": "npm run build && npm run lint"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [],
-    "nodes": ["dist/nodes/IpQuery/IpQuery.node.js"]
+    "nodes": [
+      "dist/nodes/IpQuery/IpQuery.node.js"
+    ]
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
@@ -42,5 +54,7 @@
     "rimraf": "^6.0.0",
     "typescript": "^5.5.0"
   },
-  "peerDependencies": { "n8n-workflow": "*" }
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
 }
