@@ -1,85 +1,92 @@
 # n8n-nodes-ipquery
 
-Nodo community de [n8n](https://n8n.io) para **[ipquery.io](https://ipquery.io/#endpoints)**:
-geolocalización y datos de IP. UI en español. **Sin API key y por HTTPS.**
+An [n8n](https://n8n.io) community node for **[ipquery.io](https://ipquery.io/#endpoints)**:
+IP geolocation and network data. **No API key, served over HTTPS.**
 
-## Qué da
+## What it returns
 
 `ip`, `isp {asn, org, isp}`, `location {country, country_code, state, city, zipcode, latitude,
-longitude, timezone, localtime}` y `risk {is_mobile, is_vpn, is_tor, is_proxy, is_datacenter,
+longitude, timezone, localtime}` and `risk {is_mobile, is_vpn, is_tor, is_proxy, is_datacenter,
 risk_score}`.
 
-## Los flags de riesgo no son confiables para decidir seguridad
+## The risk flags are not dependable for security decisions
 
-Medición propia del **2026-07-28** contra IPs de naturaleza conocida:
+Measured on 2026-07-28 against addresses of known nature:
 
-| IP | Qué es | ipquery | ip-api |
+| IP | What it is | ipquery | ip-api |
 |---|---|---|---|
-| `185.220.101.1` | salida Tor conocida | `is_tor: false`, `is_proxy: false`, `risk_score: 0` | `proxy: true` |
-| `171.25.193.25` | salida Tor conocida (DFRI) | `is_tor: false`, `is_proxy: false`, `risk_score: 0` | `proxy: true` |
+| `185.220.101.1` | known Tor exit relay | `is_tor: false`, `is_proxy: false`, `risk_score: 0` | `proxy: true` |
+| `171.25.193.25` | known Tor exit relay (DFRI) | `is_tor: false`, `is_proxy: false`, `risk_score: 0` | `proxy: true` |
 | `45.33.32.156` | datacenter (Linode) | `is_datacenter: true` | `hosting: true` |
 | `8.8.8.8` | datacenter (Google) | `is_datacenter: true` | `hosting: true` |
 
-**Conclusión**: usar este servicio para **geolocalización, ASN/ISP y detección de datacenter**
-(donde coincidió 4/4 con ip-api). Para **reputación** (proxy/VPN/Tor), usar
-[n8n-nodes-ip-api](https://git.sockets.ar/hernan/n8n-nodes-ip-api) u otra fuente. El nodo muestra
-este aviso en la propia UI.
+Use this service for **geolocation, ASN/ISP and datacenter detection**, where it matched ip-api on
+all four samples. For **reputation** (proxy/VPN/Tor) use another source. The node shows this warning
+in its own UI.
 
-## Ventajas sobre el tier gratuito de ip-api
+## Compared to the free ip-api tier
 
 | | ipquery | ip-api (free) |
 |---|---|---|
-| TLS | **HTTPS** | HTTP plano |
-| API key | no necesita | no necesita |
-| Uso comercial | sin restricción declarada | **no permitido** |
-| Lote | IPs separadas por coma en la URL (300 probadas OK) | `POST /batch`, 100 máx |
-| Rate limit | sin límite documentado ni headers | 45/min (15/min en lote), ban de 1 h |
+| TLS | **HTTPS** | plain HTTP |
+| API key | not needed | not needed |
+| Commercial use | no stated restriction | **not allowed** |
+| Bulk | comma separated in the URL (300 verified) | `POST /batch`, 100 max |
+| Rate limit | none documented, no headers | 45/min (15/min bulk), 1 hour ban |
 
-## Operaciones
+## Operations
 
-| Operación | Endpoint |
+| Operation | Endpoint |
 |---|---|
-| **Consultar IP** | `GET /{ip}` - v4 y v6. **No acepta dominios** |
-| **Consulta en Lote** | `GET /{ip1,ip2,…}` - toma la IP de cada item de entrada |
-| **Consultar Mi IP** | `GET /?format=json` |
+| **Look Up IP** | `GET /{ip}` - IPv4 and IPv6. **Domain names are not accepted** |
+| **Look Up Many (Bulk)** | `GET /{ip1,ip2,...}` - takes the IP from every input item |
+| **Look Up Own IP** | `GET /?format=json` |
 
-Opciones: **aplanar resultado** (objeto plano en vez de anidado, para comparar con otras fuentes),
-**tamaño de lote** y **TTL de caché** por IP.
+Options: **flatten result** (flat object instead of the nested shape, easier to compare against
+other providers), **batch size** and **per-IP cache TTL**.
 
-Marcado `usableAsTool`: n8n genera la variante **IPQuery Tool** para AI Agents.
+The node is marked `usableAsTool`, so n8n also exposes an **IPQuery Tool** variant for AI Agents.
 
-## Una IP privada devuelve 200, no un error
+## A private IP answers 200, not an error
 
 ```json
 {"ip":"192.168.1.1","isp":{"asn":"AS0","org":"","isp":""},
- "location":{"country":"","city":"","latitude":0.0165,"longitude":0.0153,…}}
+ "location":{"country":"","city":"","latitude":0.0165,"longitude":0.0153}}
 ```
 
-Campos vacíos y coordenadas basura cerca de (0,0). Si no se detecta, el workflow cree que
-geolocalizó algo y termina apuntando a *null island*. El nodo agrega **`found: false`** cuando el
-país viene vacío y el ASN es `AS0`. Una IP mal formada sí devuelve **404** con cuerpo de texto.
+Empty fields and junk coordinates near (0,0). Left undetected, a workflow believes it geolocated
+something and ends up pointing at null island. The node adds **`found: false`** when the country is
+empty and the ASN is `AS0`. A malformed address does return **404** with a plain text body.
 
-## Uso típico: enriquecer alertas de Wazuh
+## Typical use: enriching security alerts
 
 ```
-[Wazuh Trigger] > [IPQuery: Lote, Campo Con La IP = data.srcip] > [IF geo.isDatacenter] > [aviso]
+[Trigger] -> [IPQuery: Bulk, Field With the IP = data.srcip] -> [IF geo.isDatacenter] -> [notify]
 ```
 
-El resultado se agrega a cada item bajo la clave **`geo`**, sin pisar la alerta original.
+Results are attached to each item under the **`geo`** key, leaving the original payload untouched.
 
-## Desarrollo
+## Languages
+
+The node UI ships in English. A Spanish translation is included: set `N8N_DEFAULT_LOCALE=es` on your
+n8n instance and the node's labels, descriptions and placeholders switch to Spanish.
+
+Translations live in `nodes/IpQuery/translations/<locale>/ipQuery.json`. The file name must match
+the node's `name` property, which is how n8n resolves it.
+
+## Development
 
 ```bash
 npm install
-npm run build
+npm run build          # tsc + icons + translations + dist verification
 npm run lint
-node tools/smoke.mjs   # 8 chequeos contra la API real
+node tools/smoke.mjs   # 8 checks against the live API
 ```
 
-> **No correr `npm run lintfix` sobre strings con acentos**: el autofix de sentence-case de
-> `eslint-plugin-n8n-nodes-base` corrompe UTF-8.
+`npm run build` ends with `tools/verify-build.mjs`, which fails the build if anything declared
+(nodes, credentials, icons, translations) is missing from `dist`.
 
-## Instalación (custom folder)
+## Install (custom folder)
 
 ```bash
 npm run build && npm pack
@@ -91,8 +98,8 @@ docker exec -u root <container> sh -c "cd /tmp && tar xzf n8n-nodes-ipquery-0.1.
 docker compose restart n8n
 ```
 
-Tipo del nodo: `CUSTOM.ipQuery` (y `CUSTOM.ipQueryTool` para agentes).
+Node type: `CUSTOM.ipQuery` (and `CUSTOM.ipQueryTool` for agents).
 
-## Licencia
+## License
 
 MIT.

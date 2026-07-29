@@ -1,0 +1,56 @@
+{
+  "header": {
+    "displayName": "IPQuery",
+    "description": "Consulta geolocalización y datos de red de una IP con ipquery.io"
+  },
+  "nodeView": {
+    "accuracyNotice": {
+      "displayName": "ipquery.io no necesita API key y responde por HTTPS. Sus flags de riesgo (proxy/VPN/Tor) son poco confiables: en pruebas contra salidas de Tor conocidas devolvió is_tor false. Para reputación usá ip-api; esto sirve para geolocalización, ASN/ISP y detección de datacenter."
+    },
+    "operation": {
+      "displayName": "Operación",
+      "options": {
+        "lookup": {
+          "displayName": "Consultar IP",
+          "description": "Geolocaliza una única dirección IPv4 o IPv6"
+        },
+        "batch": {
+          "displayName": "Consultar Varias (Lote)",
+          "description": "Toma la IP de cada item de entrada y consulta muchas por request, separadas por coma en la URL"
+        },
+        "mine": {
+          "displayName": "Consultar Mi IP",
+          "description": "Devuelve los datos de la IP pública desde la que sale esta instancia de n8n"
+        }
+      }
+    },
+    "query": {
+      "displayName": "IP",
+      "description": "Dirección IPv4 o IPv6 a consultar. Este servicio no acepta nombres de dominio",
+      "placeholder": "8.8.8.8"
+    },
+    "ipField": {
+      "displayName": "Campo Con La IP",
+      "description": "Nombre del campo de cada item que contiene la IP. Admite rutas anidadas con puntos, por ejemplo data.srcip en una alerta de Wazuh.",
+      "placeholder": "data.srcip"
+    },
+    "options": {
+      "displayName": "Opciones",
+      "placeholder": "Agregar Opción",
+      "options": {
+        "batchSize": {
+          "displayName": "Tamaño Del Lote",
+          "description": "Cuántas IP se piden por request. El límite real no es la cantidad sino el largo de la URL: 300 IPv4 son unos 2800 caracteres."
+        },
+        "cacheTtl": {
+          "displayName": "TTL De Caché (Segundos)",
+          "description": "Cuánto se reutiliza una IP ya resuelta dentro de este workflow. 0 desactiva la caché."
+        },
+        "flatten": {
+          "displayName": "Aplanar Resultado",
+          "description": "Si la respuesta se devuelve como objeto plano (country, city, asn, isDatacenter…) en vez de la estructura anidada de la API. Facilita compararla con la de otros proveedores."
+        }
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@ import type {
 import { NodeOperationError } from 'n8n-workflow';
 
 const BASE_URL = 'https://api.ipquery.io';
-/** Tope por request. El límite real es el largo de la URL, no la cantidad. */
+/** Per-request cap. The real limit is URL length, not the number of IPs. */
 const BATCH_MAX = 200;
 
 interface CacheEntry {
@@ -17,19 +17,18 @@ interface CacheEntry {
 }
 
 /**
- * IPQuery - geolocalización y datos de IP con ipquery.io.
+ * IPQuery - IP geolocation and enrichment through ipquery.io.
  *
- * Sin API key y por **HTTPS**, que es la diferencia práctica más grande con el
- * endpoint gratuito de ip-api (HTTP plano). Consulta en lote metiendo las IPs
- * separadas por coma en la propia URL.
+ * No API key and served over HTTPS, which is the practical difference with the
+ * free ip-api endpoint (plain HTTP). Bulk lookups carry the addresses in the URL
+ * itself, comma separated.
  *
- * **Los flags de riesgo no son confiables para decisiones de seguridad.**
- * Medido el 2026-07-28 contra dos relays de salida de Tor conocidos
- * (`185.220.101.1`, `171.25.193.25`): ipquery devuelve `is_tor: false`,
- * `is_proxy: false` y `risk_score: 0`, mientras que ip-api marca `proxy: true`
- * en ambos. Donde sí coincide es en `is_datacenter` (4/4 con el `hosting` de
- * ip-api). Úsese para **geo, ASN/ISP y datacenter**; para reputación
- * (proxy/VPN/Tor) usar ip-api u otra fuente.
+ * Do not take security decisions from the risk flags. Checked against two known
+ * Tor exit relays (185.220.101.1 and 171.25.193.25, July 2026) ipquery answers
+ * is_tor false, is_proxy false and risk_score 0, while ip-api flags both as
+ * proxy. The is_datacenter flag does agree with ip-api's hosting. Use ipquery
+ * for geolocation, ASN/ISP and datacenter detection, and a different source for
+ * reputation.
  */
 export class IpQuery implements INodeType {
 	description: INodeTypeDescription = {
@@ -39,7 +38,7 @@ export class IpQuery implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
-		description: 'Geolocaliza y enriquece direcciones IP con ipquery.io',
+		description: 'Look up IP geolocation and network data with ipquery.io',
 		defaults: { name: 'IPQuery' },
 		inputs: ['main'],
 		outputs: ['main'],
@@ -48,36 +47,35 @@ export class IpQuery implements INodeType {
 		properties: [
 			{
 				displayName:
-					'ipquery.io no necesita API key y responde por HTTPS. Sus flags de riesgo (proxy/VPN/Tor) son poco confiables: en pruebas contra salidas de Tor conocidas devolvió is_tor false. Para reputación usá ip-api; esto sirve para geolocalización, ASN/ISP y detección de datacenter.',
+					'ipquery.io needs no API key and answers over HTTPS. Its risk flags (proxy/VPN/Tor) are unreliable: in tests against known Tor exit relays it reported is_tor false. Use ip-api for reputation; use this for geolocation, ASN/ISP and datacenter detection.',
 				name: 'accuracyNotice',
 				type: 'notice',
 				default: '',
 			},
 			{
-				displayName: 'Operación',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
 				default: 'lookup',
 				options: [
 					{
-						name: 'Consulta en Lote',
-						value: 'batch',
-						action: 'Consultar varias IP en lote',
-						description:
-							'Toma la IP de cada item de entrada y consulta muchas por request, separadas por coma en la URL',
-					},
-					{
-						name: 'Consultar IP',
+						name: 'Look Up IP',
 						value: 'lookup',
-						action: 'Consultar una IP',
-						description: 'Geolocaliza una IP v4 o v6',
+						action: 'Look up an IP',
+						description: 'Geolocate a single IPv4 or IPv6 address',
 					},
 					{
-						name: 'Consultar Mi IP',
+						name: 'Look Up Many (Bulk)',
+						value: 'batch',
+						action: 'Look up many addresses in bulk',
+						description: 'Take the IP from every input item and look many up per request, comma-separated in the URL',
+					},
+					{
+						name: 'Look Up Own IP',
 						value: 'mine',
-						action: 'Consultar la IP propia',
-						description: 'Devuelve los datos de la IP pública desde la que sale n8n',
+						action: 'Look up own IP',
+						description: 'Return data about the public IP this n8n instance goes out with',
 					},
 				],
 			},
@@ -89,10 +87,10 @@ export class IpQuery implements INodeType {
 				required: true,
 				placeholder: '8.8.8.8',
 				displayOptions: { show: { operation: ['lookup'] } },
-				description: 'Dirección IP v4 o v6 a consultar. Este servicio no acepta nombres de dominio.',
+				description: 'IPv4 or IPv6 address to look up. This service does not accept domain names.',
 			},
 			{
-				displayName: 'Campo Con La IP',
+				displayName: 'Field With the IP',
 				name: 'ipField',
 				type: 'string',
 				default: 'ip',
@@ -100,40 +98,40 @@ export class IpQuery implements INodeType {
 				placeholder: 'data.srcip',
 				displayOptions: { show: { operation: ['batch'] } },
 				description:
-					'Nombre del campo de cada item que contiene la IP. Admite rutas anidadas con puntos, por ejemplo data.srcip para una alerta de Wazuh.',
+					'Name of the field in each item holding the IP. Dot notation works for nested fields, for example data.srcip in a Wazuh alert.',
 			},
 			{
-				displayName: 'Opciones',
+				displayName: 'Options',
 				name: 'options',
 				type: 'collection',
-				placeholder: 'Agregar Opción',
+				placeholder: 'Add Option',
 				default: {},
 				options: [
 					{
-						displayName: 'Aplanar Resultado',
-						name: 'flatten',
-						type: 'boolean',
-						default: false,
-						description:
-							'Si la respuesta se devuelve como un objeto plano (country, city, asn, isDatacenter…) en vez de la estructura anidada de la API. Facilita comparar con la salida de otros servicios.',
-					},
-					{
-						displayName: 'Tamaño Del Lote',
+						displayName: 'Batch Size',
 						name: 'batchSize',
 						type: 'number',
 						default: 100,
 						typeOptions: { minValue: 1, maxValue: BATCH_MAX },
 						description:
-							'Cuántas IP se piden por request. El límite real no es la cantidad sino el largo de la URL: 300 IPv4 son unos 2800 caracteres.',
+							'How many IPs to request at once. The real limit is URL length rather than count: 300 IPv4 addresses are about 2800 characters.',
 					},
 					{
-						displayName: 'TTL De Caché (Segundos)',
+						displayName: 'Cache TTL (Seconds)',
 						name: 'cacheTtl',
 						type: 'number',
 						default: 3600,
 						typeOptions: { minValue: 0 },
 						description:
-							'Cuánto se reutiliza el resultado de una IP ya consultada, dentro del mismo workflow. 0 desactiva la caché.',
+							'How long an already resolved IP is reused within this workflow. Set to 0 to disable the cache.',
+					},
+					{
+						displayName: 'Flatten Result',
+						name: 'flatten',
+						type: 'boolean',
+						default: false,
+						description:
+							'Whether to return a flat object (country, city, asn, isDatacenter and so on) instead of the nested API shape. Makes it easier to compare against other providers.',
 					},
 				],
 			},
@@ -168,10 +166,10 @@ export class IpQuery implements INodeType {
 		};
 
 		/**
-		 * Una IP privada o reservada devuelve HTTP 200 con los campos vacíos y
-		 * coordenadas basura cerca de (0,0) - no un error. Si no se detecta, el
-		 * workflow cree que geolocalizó algo y termina apuntando a "null island".
-		 * Se marca explícitamente con `found: false`.
+		 * A private or reserved address answers HTTP 200 with empty fields and junk
+		 * coordinates near (0,0) instead of an error. Go past that and the workflow
+		 * takes it for a real location and points at null island, so mark it with
+		 * found false.
 		 */
 		const isEmptyResult = (data: IDataObject): boolean => {
 			const location = (data.location ?? {}) as IDataObject;
@@ -218,7 +216,7 @@ export class IpQuery implements INodeType {
 
 		const out: INodeExecutionData[] = [];
 
-		// --- Consulta en lote ---------------------------------------------------
+		// --- Bulk lookup --------------------------------------------------------
 		if (operation === 'batch') {
 			const ipField = this.getNodeParameter('ipField', 0) as string;
 			const readPath = (obj: IDataObject, path: string): unknown =>
@@ -240,7 +238,7 @@ export class IpQuery implements INodeType {
 
 			for (let i = 0; i < pending.length; i += batchSize) {
 				const chunk = pending.slice(i, i + batchSize);
-				// Un único elemento devuelve un objeto, no un array: se normaliza.
+				// A single address answers with an object rather than an array.
 				const response = (await request(chunk.join(','))) as IDataObject | IDataObject[];
 				const list = Array.isArray(response) ? response : [response];
 				for (const entry of list) {
@@ -259,8 +257,8 @@ export class IpQuery implements INodeType {
 					json: {
 						...item.json,
 						geo: ip
-							? (results.get(ip) ?? { ip, found: false, error: 'sin resultado' })
-							: { found: false, error: `el item no trae el campo ${ipField}` },
+							? (results.get(ip) ?? { ip, found: false, error: 'no result' })
+							: { found: false, error: `item has no ${ipField} field` },
 					},
 					pairedItem: { item: index },
 				});
@@ -269,7 +267,7 @@ export class IpQuery implements INodeType {
 			return [out];
 		}
 
-		// --- Consultas individuales --------------------------------------------
+		// --- Single lookups -----------------------------------------------------
 		for (let i = 0; i < items.length; i++) {
 			if (operation === 'mine') {
 				const data = (await request('?format=json')) as IDataObject;
@@ -279,7 +277,7 @@ export class IpQuery implements INodeType {
 
 			const query = (this.getNodeParameter('query', i) as string).trim();
 			if (!query) {
-				throw new NodeOperationError(this.getNode(), 'Falta la IP a consultar', { itemIndex: i });
+				throw new NodeOperationError(this.getNode(), 'No IP address to look up', { itemIndex: i });
 			}
 
 			const cached = getCached(query);
@@ -293,7 +291,7 @@ export class IpQuery implements INodeType {
 				if (data.found) setCached(query, data);
 				out.push({ json: data, pairedItem: { item: i } });
 			} catch (error) {
-				// Una IP mal formada devuelve 404 con un cuerpo de texto plano.
+				// A malformed address answers 404 with a plain text body.
 				if (this.continueOnFail()) {
 					out.push({
 						json: { ip: query, found: false, error: (error as Error).message },
@@ -301,11 +299,9 @@ export class IpQuery implements INodeType {
 					});
 					continue;
 				}
-				throw new NodeOperationError(
-					this.getNode(),
-					`ipquery.io no reconoció la IP "${query}"`,
-					{ itemIndex: i },
-				);
+				throw new NodeOperationError(this.getNode(), `ipquery.io did not accept the IP "${query}"`, {
+					itemIndex: i,
+				});
 			}
 		}
 

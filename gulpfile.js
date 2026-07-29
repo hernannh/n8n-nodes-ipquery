@@ -6,16 +6,18 @@ const { src, dest } = require('gulp');
 // n8n can resolve `icon: 'file:...'` at runtime.
 //
 // `allowEmpty` covers a glob that matches nothing, but not a directory that does
-// not exist: gulp throws ENOENT on the scandir. Guard the credentials folder so
-// the same gulpfile works in a package that ships none.
+// not exist: gulp throws ENOENT on the scandir. This package ships no
+// credentials, so that folder is only copied when it is there.
 function buildIcons() {
-	const nodeSource = path.resolve('nodes', '**', '*.{png,svg}');
+	// The .json files under translations/ have to reach dist as well: n8n looks
+	// them up at <nodeDir>/translations/<locale>/<nodeName>.json
+	const nodeSource = path.resolve('nodes', '**', '*.{png,svg,json}');
 	const nodeDestination = path.resolve('dist', 'nodes');
 	const nodes = src(nodeSource).pipe(dest(nodeDestination));
 
 	if (!existsSync(path.resolve('credentials'))) return nodes;
 
-	const credSource = path.resolve('credentials', '**', '*.{png,svg}');
+	const credSource = path.resolve('credentials', '**', '*.{png,svg,json}');
 	const credDestination = path.resolve('dist', 'credentials');
 	return src(credSource, { allowEmpty: true }).pipe(dest(credDestination));
 }

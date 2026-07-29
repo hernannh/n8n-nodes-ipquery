@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-ipquery",
   "version": "0.1.0",
-  "description": "Nodo community de n8n para ipquery.io: geolocalización y datos de IP (país, ciudad, ASN, ISP, flags de riesgo) por HTTPS, sin API key, con consulta en lote.",
+  "description": "n8n community node for ipquery.io: IP geolocation and network data (country, city, ASN, ISP, risk flags) over HTTPS, no API key, with bulk lookups.",
   "keywords": [
     "n8n-community-node-package",
     "ipquery",
