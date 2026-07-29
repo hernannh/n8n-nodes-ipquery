@@ -12,14 +12,17 @@
     "sockets-ar"
   ],
   "license": "MIT",
-  "homepage": "https://git.sockets.ar/hernan/n8n-nodes-ipquery",
+  "homepage": "https://github.com/hernannh/n8n-nodes-ipquery#readme",
   "author": {
     "name": "Hernan Herrera",
     "email": "hernannh@gmail.com"
   },
   "repository": {
     "type": "git",
-    "url": "https://git.sockets.ar/hernan/n8n-nodes-ipquery.git"
+    "url": "git+https://github.com/hernannh/n8n-nodes-ipquery.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hernannh/n8n-nodes-ipquery/issues"
   },
   "engines": {
     "node": ">=20.15"
